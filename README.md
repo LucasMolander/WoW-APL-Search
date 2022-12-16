@@ -10,11 +10,7 @@ APLs are typically written in human-readable form (TCI, aka
 deathknight="T29_Death_Knight_Unholy"
 source=default
 spec=unholy
-level=70
-race=troll
-role=attack
-position=back
-talents=BwPAAAAAAAAAAAAAAAAAAAAAAAAIIJJBSAJJRIJSSSkAAAAAAAAAAKJJhIAAgEpkIRSSikA
+# ...
 
 # Default consumables
 potion=elemental_potion_of_ultimate_power_3
@@ -26,32 +22,8 @@ actions.precombat=flask
 
 # Executed every time the actor is available.
 actions=auto_attack
-# ...
 
-# AoE Action List
-actions.aoe=any_dnd,if=...
-# ...
-
-# Potion
-actions.cooldowns=potion,if=...
-# Cooldowns
-actions.cooldowns+=/vile_contagion,target_if=...
-# ...
-# Generic
-actions.generic=death_coil,if=...
-# ...
-
-# Opener
-actions.opener=summon_gargoyle,use_off_gcd=1,if=buff.commander_of_the_dead_window.up
-# ...
-
-# Racials
-actions.racials=arcane_torrent,if=...
-# ...
-
-# Trinkets
-actions.trinkets=use_item,slot=trinket1,if=...
-# ...
+# Also do actions.aoe, actions.cooldowns, actions.generic, actions.opener, actions.racials, actions.trinkets
 
 head=maw_of_the_haunted_frostbrood,id=200408,bonus_id=4800/4786/1498/6935,gem_id=192985
 # ...
@@ -68,11 +40,7 @@ head=maw_of_the_haunted_frostbrood,id=200408,bonus_id=4800/4786/1498/6935,gem_id
 For example,
 [apl_death_knight.cpp](https://github.com/simulationcraft/simc/blob/dragonflight/engine/class_modules/apl/apl_death_knight.cpp):
 ```
-#include "class_modules/apl/apl_death_knight.hpp"
-
-#include "player/action_priority_list.hpp"
-#include "player/player.hpp"
-#include "dbc/dbc.hpp"
+// Headers
 
 namespace death_knight_apl {
 
@@ -88,22 +56,8 @@ void blood( player_t* p )
   // ...
 
   precombat->add_action( "flask" );
-  // ...
 
-  default_->add_action( "auto_attack" );
-  // ...
-
-  drw_up->add_action( "blood_boil,if=!dot.blood_plague.ticking" );
-  // ...
-
-  racials->add_action( "blood_fury,if=...");
-  // ...
-
-  standard->add_action( "tombstone,if=...");
-  // ...
-
-  trinkets->add_action( "use_item,slot=trinket1,if=...");
-  // ...
+  // Also add actions to default_, drw_up, racials, standard, trinkets
 }
 //blood_apl_end
 
@@ -125,27 +79,10 @@ e.g. [T29_Generate_Death_Knight.simc](github.com/simulationcraft/simc/blob/84ea5
 ```
 deathknight="T29_Death_Knight_Blood"
 level=70
-race=goblin
-spec=blood
-role=tank
-position=front
-talents=BoPAAAAAAAAAAAAAAAAAAAAAAACJRgkEJiEBJikIkkkEBAAAAAQikEEJNJiEAAgIJJJAAAA
+# etc.
 
 head=maw_of_the_haunted_frostbrood,id=200408,bonus_id=4800/4786/1498/1808,gem_id=192925
-neck=elemental_lariat,id=193001,bonus_id=8836/8840/8902/8960/8783/8782/8801/8793,ilevel=418,gem_id=192991/192925/192925,crafted_stats=32/36
-shoulders=jaws_of_the_haunted_frostbrood,id=200410,bonus_id=4800/4786/1498
-back=cape_of_valarjar_courage,id=133765,bonus_id=1795/6808/4786/3156,drop_level=70
-chest=breastplate_of_the_haunted_frostbrood,id=200405,bonus_id=1466/8767,ilevel=421,enchant=waking_stats_3
-wrists=shackles_of_titanic_failure,id=195533,bonus_id=4800/4786/1498/1808,gem_id=192925
-hands=grasps_of_the_haunted_frostbrood,id=200407,bonus_id=1466/8767,ilevel=421
-waist=unstable_frostfire_belt,id=191623,bonus_id=8836/8840/8902/8960/8802/8793/1808,ilevel=418,gem_id=192925,crafted_stats=40/49
-legs=greaves_of_the_godking,id=133630,bonus_id=1795/6808/4786/3156,enchant=frosted_armor_kit_3,drop_level=70
-feet=stonestep_boots,id=143974,bonus_id=4177/6808/4786/3156,enchant=watchers_loam_3,drop_level=70
-finger1=jeweled_signet_of_melandrus,id=134542,bonus_id=1795/6808/4786/3156/1808,gem_id=192925,enchant=devotion_of_haste_3,drop_level=70
-finger2=seal_of_diurnas_chosen,id=195480,bonus_id=4800/4786/1498/1808,gem_id=192925,enchant=devotion_of_critical_strike_3
-trinket1=manic_grieftorch,id=194308,bonus_id=4800/4786/1498
-trinket2=windscar_whetstone,id=137486,bonus_id=6652/3300/8767
-main_hand=incarnate_skysplitter,id=195528,bonus_id=4800/4786/1498,enchant=rune_of_the_fallen_crusader
+# etc.
 
 save=T29_Death_Knight_Blood.simc
 ```
