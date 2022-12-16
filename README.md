@@ -1,6 +1,63 @@
 # WoW-APL-Search
 Searches through the space of Action Priority Lists to find the best one.
 
+## Code Structure
+Main is in [sc_main.cpp](https://github.com/simulationcraft/simc/blob/dragonflight/engine/sc_main.cpp#L370)
+as basically just
+```
+sim_t sim;
+sim.main( io::utf8_args( argc, argv ) );
+```
+
+And `sim_t` is in [sim.hpp](https://github.com/simulationcraft/simc/blob/dragonflight/engine/sim/sim.hpp#L61)
+(which is a child of `sc_thread_t`, basically just so it can `run()`).
+
+`sim_t::main()` does some bookkeeping and reporting, then calls `simt_t::execute()`,
+which is in [sim.cpp](https://github.com/simulationcraft/simc/blob/dragonflight/engine/sim/sim.cpp#L3187).
+
+That calls [`sim_t::iterate()`](https://github.com/simulationcraft/simc/blob/dragonflight/engine/sim/sim.cpp#L2889),
+which is basically
+```
+init();
+activate_actors();
+
+do
+{
+  ++current_iteration;
+  ++work_done;
+
+  combat();
+
+  if ( progress_bar.update( false, as<int>(current_index) ) )
+  {
+    progress_bar.output( false );
+  }
+
+  do_pause();
+  auto old_active = current_index;
+  if ( ! canceled )
+  {
+    current_index = work_queue -> pop();
+    more_work = work_queue -> more_work();
+
+    if ( more_work && current_index != old_active )
+    {
+      if ( ! parent ||
+        scaling -> scale_stat != STAT_NONE ||
+        ( parent && parent -> reforge_plot -> current_stat_combo > -1 ) )
+      {
+        progress_bar.update( true, static_cast<int>( old_active ) );
+        progress_bar.output( true );
+        progress_bar.restart();
+      }
+
+      activate_actors();
+    }
+  }
+} while ( more_work && ! canceled );
+```
+
+
 ## APL Codegen (.simc --> .cpp)
 APLs are typically written in human-readable form (TCI, aka
 [TextualConfigurationInterface](github.com/simulationcraft/simc/wiki/TextualConfigurationInterface)
