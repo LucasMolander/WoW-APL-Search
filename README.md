@@ -25,36 +25,51 @@ do
 {
   ++current_iteration;
   ++work_done;
-
   combat();
-
-  if ( progress_bar.update( false, as<int>(current_index) ) )
-  {
-    progress_bar.output( false );
-  }
-
+  // Progress bar
   do_pause();
-  auto old_active = current_index;
   if ( ! canceled )
   {
     current_index = work_queue -> pop();
     more_work = work_queue -> more_work();
-
     if ( more_work && current_index != old_active )
     {
-      if ( ! parent ||
-        scaling -> scale_stat != STAT_NONE ||
-        ( parent && parent -> reforge_plot -> current_stat_combo > -1 ) )
-      {
-        progress_bar.update( true, static_cast<int>( old_active ) );
-        progress_bar.output( true );
-        progress_bar.restart();
-      }
-
+      // Work indices, etc. for updating Progress Bar
       activate_actors();
     }
   }
 } while ( more_work && ! canceled );
+```
+
+### Combat
+So the next interesting function is [`sim_t::combat()`](https://github.com/simulationcraft/simc/blob/dragonflight/engine/sim/sim.cpp#L1752)
+which is just
+```
+combat_begin();
+event_mgr.execute();
+combat_end();
+```
+
+[`sim_t::combat_begin()`](https://github.com/simulationcraft/simc/blob/dragonflight/engine/sim/sim.cpp#L1814)
+is like this:
+```
+// Debug stuff
+
+reset();
+
+iteration_dmg = priority_iteration_dmg = iteration_heal = 0;
+datacollection_begin();
+for ( auto& target : target_list ) target -> combat_begin();
+
+// Override arcane_intellect, battle_shout, mark_of_the_wild, and power_word_fortitude
+
+// Call combat_begin() on each module_t in module_t::get( i ) for i PLAYER_NONE to PLAYER_MAX
+
+// Call combat_begin() on each player_t in player_list, player_no_pet_list, and their pets
+
+// If required, call make_event() for regen_event_t, bloodlust_check_t, sim_end_event_t, and sim_safeguard_end_event_t
+
+raid_event_t::combat_begin( this );
 ```
 
 
