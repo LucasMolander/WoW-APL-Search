@@ -72,6 +72,44 @@ for ( auto& target : target_list ) target -> combat_begin();
 raid_event_t::combat_begin( this );
 ```
 
+#### Event Manager
+The **event manager** struct definition is in
+[event_manager.hpp](https://github.com/simulationcraft/simc/blob/2ebb7a1fb07f34d5a4a15a5452960f85959fc664/engine/sim/event_manager.hpp#L20)
+and [`event_manager_t::execute()`](https://github.com/simulationcraft/simc/blob/11753b3fd4fdad168be124a76d849ed427987071/engine/sim/event_manager.cpp#L203)
+is like this:
+```
+unsigned n_events = 0U;
+
+while ( event_t* e = next_event() )
+{
+  if ( e->time == current_time ) {
+    if ( ++n_events == MAX_EVENTS ) {
+      cancel_stuck();
+    }
+  } else {
+    n_events = 0U;
+  }
+
+  current_time = e->time;
+
+  if ( e->reschedule_time > e->time ) {
+    reschedule_event( e ); continue;
+  } else {
+    // Optionally monitor CPU of the event
+    e->execute();
+  }
+
+  recycle_event( e );
+}
+
+return true;
+```
+
+`sim_t::sim_t()` constructs `event_mgr( this )`, and  `sim_t::init()` calls `event_mgr.init()`.
+`event_manager_t::event_manager_t()` is basic and non-interesting.
+On the other hand,
+[`event_manager_t::init`](https://github.com/simulationcraft/simc/blob/11753b3fd4fdad168be124a76d849ed427987071/engine/sim/event_manager.cpp#L319)
+is slightly more interesting:
 
 ## APL Codegen (.simc --> .cpp)
 APLs are typically written in human-readable form (TCI, aka
