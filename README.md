@@ -1,7 +1,7 @@
 # WoW-APL-Search
 Searches through the space of Action Priority Lists to find the best one.
 
-## Code Structure
+# Code Structure
 Main is in [sc_main.cpp](https://github.com/simulationcraft/simc/blob/dragonflight/engine/sc_main.cpp#L370)
 as basically just
 ```
@@ -13,9 +13,21 @@ And `sim_t` is in [sim.hpp](https://github.com/simulationcraft/simc/blob/dragonf
 (which is a child of `sc_thread_t`, basically just so it can `run()`).
 
 `sim_t::main()` does some bookkeeping and reporting, then calls `simt_t::execute()`,
-which is in [sim.cpp](https://github.com/simulationcraft/simc/blob/dragonflight/engine/sim/sim.cpp#L3187).
+which is in [sim.cpp](https://github.com/simulationcraft/simc/blob/dragonflight/engine/sim/sim.cpp#L3187):
+```
+bool success = false;
+{
+  auto merge_final_action = gsl::finally([&](){ merge(); }); // Always merge, even in cases of unsuccessful simulation!
+  partition();
+  success = iterate();
+}
+return success;
+```
 
-That calls [`sim_t::iterate()`](https://github.com/simulationcraft/simc/blob/dragonflight/engine/sim/sim.cpp#L2889),
+`sim_t::partition()` allocates work iterations (`work_queue -> size()`) amongst threads
+via `children.push_back( new sim_t( this, i + 1, child_control ) )`
+
+`sim_t::execute()` calls [`sim_t::iterate()`](https://github.com/simulationcraft/simc/blob/dragonflight/engine/sim/sim.cpp#L2889),
 which is basically
 ```
 init();
@@ -41,7 +53,70 @@ do
 } while ( more_work && ! canceled );
 ```
 
-### Combat
+And here's `sim_t::init()`:
+```
+const auto start_time = chrono::wall_clock::now();
+
+event_mgr.init();
+
+// Seed RNG
+
+// Set lag_stddev values
+
+// Challenge mode or scaling item level
+
+// set scaling metric
+
+// Make the buffs (on `auras`) arcane_intellect, battle_shout, mark_of_the_wild, and power_word_fortitude
+
+// Find Already defined target, otherwise create a new one.
+
+// create additional enemies here
+
+// Determine whether we have healers or tanks.
+
+raid_event_t::init( this );
+
+init_actors();
+
+simulation_length.reserve( std::min( iterations, 10000 ) );
+
+// For each actor in actor_list, call init_finished()
+
+// If save= option is used, don't bother initializing profilesets
+```
+
+And here's `sim_t::activate_actors()`:
+```
+// Call reset_callbacks() on lots of lists
+
+if ( ! single_actor_batch ) {
+  range::for_each( player_list, []( player_t* p ) { p -> activate(); } );
+}
+// Single-actor batch mode activates the current active actor
+else
+{
+  range::for_each( target_list, []( player_t* t ) { t -> actor_changed(); } );
+
+  // Deactivate old actor
+  if ( current_index > 0 )
+  {
+    player_no_pet_list[ current_index - 1 ] -> deactivate();
+  }
+
+  // Activate new actor
+  player_no_pet_list[ current_index ] -> activate();
+  if ( ! profileset_enabled )
+  {
+    progress_bar.set_phase( player_no_pet_list[ current_index ] -> name_str );
+  }
+}
+```
+
+## Events
+`struct event_t` is in [event.hpp](https://github.com/simulationcraft/simc/blob/2ebb7a1fb07f34d5a4a15a5452960f85959fc664/engine/sim/event.hpp#L45).
+
+## Combat
 So the next interesting function is [`sim_t::combat()`](https://github.com/simulationcraft/simc/blob/dragonflight/engine/sim/sim.cpp#L1752)
 which is just
 ```
@@ -72,10 +147,13 @@ for ( auto& target : target_list ) target -> combat_begin();
 raid_event_t::combat_begin( this );
 ```
 
-#### Event Manager
-The **event manager** struct definition is in
-[event_manager.hpp](https://github.com/simulationcraft/simc/blob/2ebb7a1fb07f34d5a4a15a5452960f85959fc664/engine/sim/event_manager.hpp#L20)
-and [`event_manager_t::execute()`](https://github.com/simulationcraft/simc/blob/11753b3fd4fdad168be124a76d849ed427987071/engine/sim/event_manager.cpp#L203)
+### Event Manager
+The `event_manager_t` struct definition is in
+[event_manager.hpp](https://github.com/simulationcraft/simc/blob/2ebb7a1fb07f34d5a4a15a5452960f85959fc664/engine/sim/event_manager.hpp#L20).
+It has:
+* `std::vector<event_t*> timing_wheel`
+
+Moreover, [`event_manager_t::execute()`](https://github.com/simulationcraft/simc/blob/11753b3fd4fdad168be124a76d849ed427987071/engine/sim/event_manager.cpp#L203)
 is like this:
 ```
 unsigned n_events = 0U;
@@ -105,17 +183,52 @@ while ( event_t* e = next_event() )
 return true;
 ```
 
+And here is [event_manager_t::next_event()](https://github.com/simulationcraft/simc/blob/11753b3fd4fdad168be124a76d849ed427987071/engine/sim/event_manager.cpp#L350):
+```
+  if ( events_remaining == 0 )
+    return nullptr;
+
+  while ( true )
+  {
+    event_t*& event_list = timing_wheel[ timing_slice ];
+    if ( event_list )
+    {
+      event_t* e = event_list;
+      event_list = e->next;
+      events_remaining--;
+      events_processed++;
+      return e;
+    }
+
+    timing_slice++;
+    if ( timing_slice == timing_wheel.size() )
+    {
+      timing_slice = 0;
+      // Time Wheel turns around.
+    }
+  }
+
+  return nullptr;
+```
+
 `sim_t::sim_t()` constructs `event_mgr( this )`, and  `sim_t::init()` calls `event_mgr.init()`.
 `event_manager_t::event_manager_t()` is basic and non-interesting.
 On the other hand,
 [`event_manager_t::init`](https://github.com/simulationcraft/simc/blob/11753b3fd4fdad168be124a76d849ed427987071/engine/sim/event_manager.cpp#L319)
 is slightly more interesting:
 ```
+<<<<<<< HEAD
 // Set wheel_seconds to 1024 and wheel_granularity to 32
 
 wheel_time = timespan_t::from_seconds( wheel_seconds );
 
 // Only valid for integer based timespan_t
+=======
+// Conditionally set wheel_seconds to 1024 and wheel_granularity to 32
+
+wheel_time = timespan_t::from_seconds( wheel_seconds );
+
+>>>>>>> 86fc4c5809e8bee4592976a895fa39ab20952b8b
 wheel_size = ( uint32_t )( wheel_time.total_millis() >> wheel_shift );
 
 // Round up the wheel depth to the nearest power of 2 to enable a fast "mod"
@@ -132,7 +245,7 @@ wheel_mask--;
 timing_wheel.resize( wheel_size );
 ```
 
-## APL Codegen (.simc --> .cpp)
+# APL Codegen (.simc --> .cpp)
 APLs are typically written in human-readable form (TCI, aka
 [TextualConfigurationInterface](github.com/simulationcraft/simc/wiki/TextualConfigurationInterface)
 ), usually in files with the `.simc` extension. For example,
@@ -201,12 +314,16 @@ void blood( player_t* p )
 
 The C++ code is what's actually used by the simuation.
 
+<<<<<<< HEAD
 ### SIMC Generation
 **TL;DR**
 1. The class-based .simc files in `profiles/generators/Tier29` are basically just lists of gear and talents
 2. The `generators/Tier29/T29_Generate.simc` file "includes" all of the other class-based .simc files in `profiles/generators/Tier29`
 3. The `profiles/Tier29` .simc files are generated by running the `simc` executable on `generators/Tier29/T29_Generate.simc`
 
+=======
+## SIMC Generation
+>>>>>>> 86fc4c5809e8bee4592976a895fa39ab20952b8b
 The `.simc` file that's converted to C++ code is, itself, codegen'd.
 
 There is one file per *class* in `profiles/generators/Tier29/`
@@ -263,5 +380,5 @@ simc ../generators/Tier29/T29_Generate.simc
 That generates all of the `.simc` files in the `engine` folder.
 I'm assuming that they're then moved over to the `profiles/Tier29` folder.
 
-## Info
+# Project Info
 Python version `3.7.4`.
